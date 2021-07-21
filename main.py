@@ -34,8 +34,9 @@ class StandingsRow:
 
 
 class Standings:
-    def __init__(self, online_judge):
+    def __init__(self, online_judge, contest_id):
         self.online_judge = online_judge
+        self.contest_id = contest_id
         self.results = []
 
     def add_result(self, handle, points, penalty):
@@ -62,10 +63,18 @@ class Standings:
         return '\n'.join([str(row) for row in self.results])
 
 
-def read_users():
+def read_users_from_file():
     f = open('data/users.txt', 'r', encoding='utf-8')
     data = f.read().split()
     users = [User(' '.join(data[i:i + 3]), data[i + 3], data[i + 4]) for i in range(0, len(data), 5)]
+    return users
+    
+    
+def load_users():
+    spreadsheet_id = open('data/spreadsheet_id.txt', 'r').read()
+    url = f'https://spreadsheets.google.com/feeds/list/{spreadsheet_id}/2/public/values?alt=json'
+    data = requests.get(url).json()['feed']['entry']
+    users = [User(row['gsx$_cokwr']['$t'], row['gsx$_cpzh4']['$t'], row['gsx$_cre1l']['$t']) for row in data[2:]]
     return users
 
 
@@ -73,7 +82,7 @@ def get_codeforces_standings(contest_id):
     url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}&showUnofficial=true'
     response = requests.get(url)
     data = response.json()
-    standings = Standings('codeforces')
+    standings = Standings('codeforces', contest_id)
     for row in data['result']['rows']:
         if row['party']['participantType'] != 'OUT_OF_COMPETITION' and row['party']['participantType'] != 'CONTESTANT':
             continue
@@ -120,7 +129,7 @@ def get_atcoder_standings(contest_id):
     url = f'https://atcoder.jp/contests/{contest_id}/standings/json'
     response = session.get(url, allow_redirects=False)
     data = response.json()
-    standings = Standings('atcoder')
+    standings = Standings('atcoder', contest_id)
     for row in data['StandingsData']:
         if not row['IsRated'] and False:
             continue
@@ -182,7 +191,7 @@ def create_standings_from_user_answers():
         create_standings(online_judge, contest_id, sheet_name)
 
 
-users = read_users()
+users = load_users()
 codeforces_handles = {user.codeforces_handle : user for user in users if user.codeforces_handle != ''}
 atcoder_handles = {user.atcoder_handle : user for user in users if user.atcoder_handle != ''}
 create_standings_from_user_answers()
