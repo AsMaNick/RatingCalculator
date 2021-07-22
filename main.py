@@ -3,6 +3,7 @@ import json
 import requests
 import jsonpickle
 import onlinejudge
+from datetime import datetime
 
 
 class User:
@@ -23,23 +24,25 @@ class User:
 
 
 class StandingsRow:
-    def __init__(self, user, place, points, penalty):
+    def __init__(self, user, place, points, penalty, is_rated):
         self.user = user
         self.place = place
         self.points = points
         self.penalty = penalty
+        self.is_rated = is_rated
 
     def __str__(self):
-        return f'{self.place}) {self.user}: ({self.points}, {self.penalty})'
+        return f'{self.place}) {self.user}: ({self.points}, {self.penalty}, rated = {self.is_rated})'
 
 
 class Standings:
-    def __init__(self, online_judge, contest_id):
+    def __init__(self, online_judge, contest_id, start_date):
         self.online_judge = online_judge
         self.contest_id = contest_id
+        self.start_date = start_date
         self.results = []
 
-    def add_result(self, handle, points, penalty):
+    def add_result(self, handle, points, penalty, is_rated):
         place = 1
         if len(self.results) > 0:
             place = len(self.results)
@@ -51,7 +54,7 @@ class Standings:
             user = atcoder_handles[handle]
         else:
             raise NotImplementedError
-        self.results.append(StandingsRow(user, place, points, penalty))
+        self.results.append(StandingsRow(user, place, points, penalty, is_rated))
 
     def empty(self):
         for result in self.results:
@@ -82,7 +85,7 @@ def get_codeforces_standings(contest_id):
     url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}&showUnofficial=true'
     response = requests.get(url)
     data = response.json()
-    standings = Standings('codeforces', contest_id)
+    standings = Standings('codeforces', contest_id, datetime.utcfromtimestamp(data['result']['contest']['startTimeSeconds']).strftime('%d.%m.%Y'))
     for row in data['result']['rows']:
         if row['party']['participantType'] != 'OUT_OF_COMPETITION' and row['party']['participantType'] != 'CONTESTANT':
             continue
@@ -90,7 +93,7 @@ def get_codeforces_standings(contest_id):
         handle = members[0]['handle']
         if len(members) != 1 or handle not in codeforces_handles:
             continue
-        standings.add_result(handle, row['points'], row['penalty'])
+        standings.add_result(handle, row['points'], row['penalty'], row['party']['participantType'] == 'CONTESTANT')
     return standings
 
 
@@ -125,11 +128,23 @@ def get_atcoder_standings(contest_id):
         session=onlinejudge.service.atcoder.utils.get_default_session()
         return session
         
+    def get_contest_date(session, contest_id):
+        url = f'https://atcoder.jp/contests/{contest_id}'
+        response = session.get(url, allow_redirects=False).text
+        pos = response.find('<small class="contest-duration">')
+        pos = response.find('</time>', pos)
+        pos = response.rfind('>', 0, pos) + 1
+        year = response[pos:pos + 4]
+        month = response[pos + 5:pos + 7]
+        day = response[pos + 8:pos + 10]
+        return f'{day}.{month}.{year}'
+        
     session = login()
+    start_date = get_contest_date(session, contest_id)
     url = f'https://atcoder.jp/contests/{contest_id}/standings/json'
     response = session.get(url, allow_redirects=False)
     data = response.json()
-    standings = Standings('atcoder', contest_id)
+    standings = Standings('atcoder', contest_id, start_date)
     for row in data['StandingsData']:
         if not row['IsRated'] and False:
             continue
@@ -140,7 +155,7 @@ def get_atcoder_standings(contest_id):
             continue
         points = row['TotalResult']['Score'] // 100
         penalty = row['TotalResult']['Elapsed'] // 10 ** 9 + row['TotalResult']['Penalty'] * 5 * 60
-        standings.add_result(handle, points, penalty)
+        standings.add_result(handle, points, penalty, row['IsRated'])
     return standings
 
 
