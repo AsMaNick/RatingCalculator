@@ -1,3 +1,4 @@
+tqdm
 requests
 stdiomask
 jsonpickle

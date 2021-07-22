@@ -1,8 +1,11 @@
 import os
+import sys
+import time
 import json
 import requests
 import jsonpickle
 import onlinejudge
+from tqdm import tqdm
 from datetime import datetime
 
 
@@ -177,6 +180,7 @@ def post_standings(standings, sheet_name):
     url = f'https://script.google.com/macros/s/{spreadsheet_app_id}/exec'
     data = jsonpickle.decode(jsonpickle.encode(standings, unpicklable=False))
     data['sheet_name'] = sheet_name
+    data['action'] = 'add_standings'
     response = requests.post(url, json=data)
     print(response.status_code)
 
@@ -198,6 +202,16 @@ def read_option(prompt, options, case_sensetive=False):
     return option
 
 
+def read_date(prompt):
+    while True:
+        try:
+            str_date = input(prompt)
+            date = datetime.strptime(str_date, '%d.%m.%Y')
+            return date
+        except Exception as e:
+            print('Date should be in format mm.dd.yyyy')
+
+
 def create_standings_from_user_answers():
     online_judge = read_option('Select online judge (codeforces or atcoder): ', ['codeforces', 'atcoder'])
     contest_id = input('Enter contest id: ')
@@ -206,7 +220,70 @@ def create_standings_from_user_answers():
         create_standings(online_judge, contest_id, sheet_name)
 
 
+def update_codeforces_ratings(start_date):
+    start_timestamp = start_date.timestamp()
+    wait_time = 5
+    ratings = []
+    for user in tqdm(users):
+        if user.codeforces_handle == '':
+            continue
+        while True:
+            url = f'https://codeforces.com/api/user.rating?handle={user.codeforces_handle}'
+            response = requests.get(url)
+            if response.status_code == 503:
+                time.sleep(wait_time)
+                continue
+            if response.status_code != 200:
+                print(f'Something went wrong, status code = {response.status_code}')
+                print(f'Response text: {response.text}')
+                time.sleep(wait_time)
+                print('Trying to repeat query')
+                continue
+            data = response.json()
+            if len(data['result']) == 0:
+                old_last_rating, old_max_rating, current_rating = 0, 0, 0
+            else:
+                old_last_rating = 1000
+                old_max_rating = 1200
+                for rating_change in data['result']:
+                    if rating_change['ratingUpdateTimeSeconds'] < start_timestamp:
+                        old_last_rating = rating_change['newRating']
+                        old_max_rating = max(old_max_rating, rating_change['newRating'])
+                    current_rating = rating_change['newRating']
+            ratings.append({
+                'handle': user.codeforces_handle,
+                'old_rating': max(old_max_rating - 200, old_last_rating),
+                'new_rating': current_rating
+            })
+            break
+    print(*ratings, sep='\n')
+    data = {
+        'ratings': ratings,
+        'action': 'update_ratings',
+        'online_judge': 'codeforces'
+    }
+    spreadsheet_app_id = open('data/spreadsheet_app_id.txt', 'r').read()
+    url = f'https://script.google.com/macros/s/{spreadsheet_app_id}/exec'
+    response = requests.post(url, json=data)
+    print(response.status_code)
+
+
+def update_ratings_from_user_answers():
+    online_judge = read_option('Select online judge (codeforces or atcoder): ', ['codeforces', 'atcoder'])
+    start_date = read_date('Enter start date (mm.dd.yyyy) for rating calculation: ')
+    if online_judge == 'codeforces':
+        update_codeforces_ratings(start_date)
+    else:
+        pass
+
+
 users = load_users()
 codeforces_handles = {user.codeforces_handle : user for user in users if user.codeforces_handle != ''}
 atcoder_handles = {user.atcoder_handle : user for user in users if user.atcoder_handle != ''}
-create_standings_from_user_answers()
+if len(sys.argv) != 2 or sys.argv[1] not in ['-s', '-r']:
+    print('There should be exactly one argument: -s for adding standings, -r for updating ratings')
+    exit()
+if sys.argv[1] == '-s':
+    create_standings_from_user_answers()
+else:
+    update_ratings_from_user_answers()

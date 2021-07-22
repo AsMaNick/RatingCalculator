@@ -89,10 +89,10 @@ function getHandle(onlineJudge, user) {
   return "-";
 }
 
-function addStandingsToTheMainRating(data) {
+function getRowByHandle(onlineJudge) {
   var sheet = ss.getSheetByName("OJ Rating");
   var participants;
-  if (data.online_judge == "codeforces") {
+  if (onlineJudge == "codeforces") {
     participants = sheet.getRange(`C4:C${sheet.getLastRow()}`).getValues();
   } else {
     participants = sheet.getRange(`D4:D${sheet.getLastRow()}`).getValues();
@@ -101,6 +101,12 @@ function addStandingsToTheMainRating(data) {
   for (var i = 0; i < participants.length; ++i) {
     rowByHandle[participants[i][0]] = i + 4;
   }
+  return rowByHandle;
+}
+
+function addStandingsToTheMainRating(data) {
+  var sheet = ss.getSheetByName("OJ Rating");
+  var rowByHandle = getRowByHandle(data.online_judge);
   var column = sheet.getLastColumn() + 1;
   sheet.getRange(2, column).setValue(data.start_date);
   sheet.getRange(3, column).setFormula(getStandingsLink(data.online_judge, data.contest_id, data.sheet_name));
@@ -112,17 +118,89 @@ function addStandingsToTheMainRating(data) {
   }
 }
 
+function getCodeforcesRatingColor(rating) {
+  if (rating <= 0) {
+    return "#000000";
+  } else if (rating < 1200) {
+    return "#808080";
+  } else if (rating < 1400) {
+    return "#008000";
+  } else if (rating < 1600) {
+    return "#03a89e";
+  } else if (rating < 1900) {
+    return "#0000ff";
+  } else if (rating < 2100) {
+    return "#a000a0";
+  } else if (rating < 2400) {
+    return "#ff8c00";
+  }
+  return "#ff0000";
+}
+
+function getRatingDiffColor(delta) {
+  if (delta == 0) {
+    return [255, 255, 255];
+  }
+  var r = 0, g = 0, b = 0, alpha = (15 + 2 * Math.abs(delta)) / 800;
+  if (delta < 0) {
+    r = 255;
+  } else {
+    g = 255;
+  }
+  var nr = Math.max(0, Math.min(255, parseInt((1 - alpha) * 255 + alpha * r + 0.5)));
+  var ng = Math.max(0, Math.min(255, parseInt((1 - alpha) * 255 + alpha * g + 0.5)));
+  var nb = Math.max(0, Math.min(255, parseInt((1 - alpha) * 255 + alpha * b + 0.5)));
+  return [nr, ng, nb];
+}
+
+function getHandleTextStyle(onlineJudge, rating) {
+  if (onlineJudge == "codeforces") {
+      return SpreadsheetApp.newTextStyle()
+        .setForegroundColor(getCodeforcesRatingColor(rating))
+        .setUnderline(false)
+        .setBold(rating > 0)
+        .build();
+  }
+  return SpreadsheetApp.newTextStyle().build();
+}
+
+function actionCreateStandings(data) {
+  if (!sheetExists(data.sheet_name)) {
+    createStandings(data);
+    addStandingsToTheMainRating(data);
+  }
+}
+
+function actionUpdateRatings(data) {
+  myLog("action update");
+  var sheet = ss.getSheetByName("OJ Rating");
+  var rowByHandle = getRowByHandle(data.online_judge);
+  myLog(rowByHandle);
+  for (var i = 0; i < data.ratings.length; ++i) {
+    var handle = data.ratings[i].handle;
+    if (handle in rowByHandle) {
+      if (data.online_judge == "codeforces") {
+        sheet.getRange(rowByHandle[handle], 3).setTextStyle(getHandleTextStyle(data.online_judge, data.ratings[i].new_rating));
+        sheet.getRange(rowByHandle[handle], 5).setValue(`${data.ratings[i].old_rating} → ${data.ratings[i].new_rating}`);
+        const [r, g, b] = getRatingDiffColor(data.ratings[i].new_rating - data.ratings[i].old_rating);
+        sheet.getRange(rowByHandle[handle], 5).setBackgroundRGB(r, g, b);
+      }
+    } else {
+      myLog(`FAIL, cann't find user ${handle}`);
+    }
+  }
+}
+
 function doPost(e) {
   var lock = LockService.getPublicLock(); 
   lock.waitLock(30000);
   try {
     var data = JSON.parse(e.postData.contents);
     myLog(data);
-    myLog(data.sheet_name);
-    myLog(data.results);
-    if (!sheetExists(data.sheet_name)) {
-      createStandings(data);
-      addStandingsToTheMainRating(data);
+    if (data.action == "add_standings") {
+      actionCreateStandings(data);
+    } else if (data.action == "update_ratings") {
+      actionUpdateRatings(data);
     }
   } finally {
     lock.releaseLock();
