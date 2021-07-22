@@ -1,3 +1,4 @@
+requests
 stdiomask
 jsonpickle
 online-judge-tools
