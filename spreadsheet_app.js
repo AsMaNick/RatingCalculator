@@ -89,6 +89,10 @@ function getHandle(onlineJudge, user) {
   return "-";
 }
 
+function getRatingCoefficientFormula(cell) {
+  return `=IF(ISERROR(SEARCH("AGC"; ${cell})); IF(ISERROR(SEARCH("ARC"; ${cell})); IF(ISERROR(SEARCH("ABC"; ${cell})); IF(ISERROR(SEARCH("Div. 1 + Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 1"; ${cell})); IF(ISERROR(SEARCH("Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 3"; ${cell})); 0; 'Config'!B8); 'Config'!B7); 'Config'!B6); 'Config'!B5); 'Config'!B4); 'Config'!B3); 'Config'!B2)`;
+}
+
 function getRowByHandle(onlineJudge) {
   var sheet = ss.getSheetByName("OJ Rating");
   var participants;
@@ -108,7 +112,7 @@ function addStandingsToTheMainRating(data) {
   var sheet = ss.getSheetByName("OJ Rating");
   var rowByHandle = getRowByHandle(data.online_judge);
   var column = sheet.getLastColumn() + 1;
-  sheet.getRange(1, column).setFormula(`=getRatingCoefficient(INDIRECT("R3C${column}"; FALSE))`);
+  sheet.getRange(1, column).setFormula(getRatingCoefficientFormula(`INDIRECT("R3C${column}"; FALSE)`));
   sheet.getRange(2, column).setValue(data.start_date);
   sheet.getRange(3, column).setFormula(getStandingsLink(data.online_judge, data.contest_id, data.sheet_name));
   for (var i = 0; i < data.results.length; ++i) {
