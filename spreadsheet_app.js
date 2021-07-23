@@ -108,12 +108,13 @@ function addStandingsToTheMainRating(data) {
   var sheet = ss.getSheetByName("OJ Rating");
   var rowByHandle = getRowByHandle(data.online_judge);
   var column = sheet.getLastColumn() + 1;
+  sheet.getRange(1, column).setFormula(`=getRatingCoefficient(INDIRECT("R3C${column}"; FALSE))`);
   sheet.getRange(2, column).setValue(data.start_date);
   sheet.getRange(3, column).setFormula(getStandingsLink(data.online_judge, data.contest_id, data.sheet_name));
   for (var i = 0; i < data.results.length; ++i) {
     var handle = getHandle(data.online_judge, data.results[i].user);
     if (handle in rowByHandle) {
-      sheet.getRange(rowByHandle[handle], column).setFormula(`=getRatingCoefficient(INDIRECT("R3C${column}"; FALSE)) * '${data.sheet_name}'!G${i + 2}`);
+      sheet.getRange(rowByHandle[handle], column).setFormula(`=INDIRECT("R3C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
     }
   }
 }
@@ -137,6 +138,36 @@ function getCodeforcesRatingColor(rating) {
   return "#ff0000";
 }
 
+function getAtcoderRatingColor(rating) {
+  if (rating <= 0) {
+    return "#000000";
+  } else if (rating < 400) {
+    return "#808080";
+  } else if (rating < 800) {
+    return "#804000";
+  } else if (rating < 1200) {
+    return "#008000";
+  } else if (rating < 1600) {
+    return "#00c0c0";
+  } else if (rating < 2000) {
+    return "#0000ff";
+  } else if (rating < 2400) {
+    return "#c0c000";
+  } else if (rating < 2800) {
+    return "#ff8000";
+  }
+  return "#ff0000";
+}
+
+function getRatingColor(onlineJudge, rating) {
+  if (onlineJudge == "codeforces") {
+    return getCodeforcesRatingColor(rating);
+  } else if (onlineJudge == "atcoder") {
+    return getAtcoderRatingColor(rating);
+  }
+  return "#000000";
+}
+
 function getRatingDiffColor(delta) {
   if (delta == 0) {
     return [255, 255, 255];
@@ -154,9 +185,9 @@ function getRatingDiffColor(delta) {
 }
 
 function getHandleTextStyle(onlineJudge, rating) {
-  if (onlineJudge == "codeforces") {
+  if (onlineJudge == "codeforces" || onlineJudge == "atcoder") {
       return SpreadsheetApp.newTextStyle()
-        .setForegroundColor(getCodeforcesRatingColor(rating))
+        .setForegroundColor(getRatingColor(onlineJudge, rating))
         .setUnderline(false)
         .setBold(rating > 0)
         .build();
@@ -175,16 +206,17 @@ function actionUpdateRatings(data) {
   myLog("action update");
   var sheet = ss.getSheetByName("OJ Rating");
   var rowByHandle = getRowByHandle(data.online_judge);
-  myLog(rowByHandle);
+  var handlesColumn = 3;
+  if (data.online_judge == "atcoder") {
+    ++handlesColumn;
+  }
   for (var i = 0; i < data.ratings.length; ++i) {
     var handle = data.ratings[i].handle;
     if (handle in rowByHandle) {
-      if (data.online_judge == "codeforces") {
-        sheet.getRange(rowByHandle[handle], 3).setTextStyle(getHandleTextStyle(data.online_judge, data.ratings[i].new_rating));
-        sheet.getRange(rowByHandle[handle], 5).setValue(`${data.ratings[i].old_rating} → ${data.ratings[i].new_rating}`);
-        const [r, g, b] = getRatingDiffColor(data.ratings[i].new_rating - data.ratings[i].old_rating);
-        sheet.getRange(rowByHandle[handle], 5).setBackgroundRGB(r, g, b);
-      }
+      sheet.getRange(rowByHandle[handle], handlesColumn).setTextStyle(getHandleTextStyle(data.online_judge, data.ratings[i].new_rating));
+      sheet.getRange(rowByHandle[handle], handlesColumn + 2).setValue(`${data.ratings[i].old_rating} → ${data.ratings[i].new_rating}`);
+      const [r, g, b] = getRatingDiffColor(data.ratings[i].new_rating - data.ratings[i].old_rating);
+      sheet.getRange(rowByHandle[handle], handlesColumn + 2).setBackgroundRGB(r, g, b);
     } else {
       myLog(`FAIL, cann't find user ${handle}`);
     }

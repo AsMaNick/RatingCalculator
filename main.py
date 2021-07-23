@@ -268,13 +268,58 @@ def update_codeforces_ratings(start_date):
     print(response.status_code)
 
 
+def update_atcoder_ratings(start_date):
+    start_timestamp = start_date.timestamp()
+    wait_time = 5
+    ratings = []
+    for user in tqdm(users):
+        if user.atcoder_handle == '':
+            continue
+        while True:
+            url = f'https://atcoder.jp/users/{user.atcoder_handle}/history/json'
+            response = requests.get(url)
+            if response.status_code == 503:
+                time.sleep(wait_time)
+                continue
+            if response.status_code != 200:
+                print(f'Something went wrong, status code = {response.status_code}')
+                print(f'Response text: {response.text}')
+                time.sleep(wait_time)
+                print('Trying to repeat query')
+                continue
+            data = response.json()
+            old_last_rating, old_max_rating, current_rating = 0, 0, 0
+            for rating_change in data:
+                timestamp = datetime.strptime(rating_change['EndTime'][:10], '%Y-%m-%d').timestamp()
+                if timestamp < start_timestamp:
+                    old_last_rating = rating_change['NewRating']
+                    old_max_rating = max(old_max_rating, rating_change['NewRating'])
+                current_rating = rating_change['NewRating']
+            ratings.append({
+                'handle': user.atcoder_handle,
+                'old_rating': max(old_max_rating - 200, old_last_rating),
+                'new_rating': current_rating
+            })
+            break
+    print(*ratings, sep='\n')
+    data = {
+        'ratings': ratings,
+        'action': 'update_ratings',
+        'online_judge': 'atcoder'
+    }
+    spreadsheet_app_id = open('data/spreadsheet_app_id.txt', 'r').read()
+    url = f'https://script.google.com/macros/s/{spreadsheet_app_id}/exec'
+    response = requests.post(url, json=data)
+    print(response.status_code)
+
+
 def update_ratings_from_user_answers():
     online_judge = read_option('Select online judge (codeforces or atcoder): ', ['codeforces', 'atcoder'])
     start_date = read_date('Enter start date (mm.dd.yyyy) for rating calculation: ')
     if online_judge == 'codeforces':
         update_codeforces_ratings(start_date)
     else:
-        pass
+        update_atcoder_ratings(start_date)
 
 
 users = load_users()
