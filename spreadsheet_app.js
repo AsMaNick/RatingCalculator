@@ -118,7 +118,7 @@ function addStandingsToTheMainRating(data) {
   for (var i = 0; i < data.results.length; ++i) {
     var handle = getHandle(data.online_judge, data.results[i].user);
     if (handle in rowByHandle) {
-      sheet.getRange(rowByHandle[handle], column).setFormula(`=INDIRECT("R1C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
+      sheet.getRange(rowByHandle[handle], column).setFormula(`=IF('${data.sheet_name}'!F${i + 2}; 1; Config!F2) * INDIRECT("R1C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
     }
   }
 }
