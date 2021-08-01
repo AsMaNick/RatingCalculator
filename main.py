@@ -218,10 +218,19 @@ def read_date(prompt):
             print('Date should be in format mm.dd.yyyy')
 
 
+def guess_online_judge(contest_id):
+    if contest_id[:3] in ['abc', 'arc', 'agc']:
+        return 'atcoder'
+    return 'codeforces'
+
+
 def create_standings_from_user_answers():
-    online_judge = read_option('Select online judge (codeforces or atcoder): ', ['codeforces', 'atcoder'])
     contest_id = input('Enter contest id: ')
-    sheet_name = input('Enter sheet name: ')
+    online_judge = guess_online_judge(contest_id)
+    if online_judge == 'atcoder':
+        sheet_name = f'{contest_id[:3].upper()} #{contest_id[3:]}'
+    else:
+        sheet_name = input('Enter sheet name: ')
     if read_option(f'Create standings "{sheet_name}" with data from {online_judge}/{contest_id}? (yes/no) ', ['y', 'n', 'yes', 'no'])[0] == 'y':
         create_standings(online_judge, contest_id, sheet_name)
 
