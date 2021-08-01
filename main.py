@@ -87,6 +87,9 @@ def load_users():
 def get_codeforces_standings(contest_id):
     url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}&showUnofficial=true'
     response = requests.get(url)
+    if response.status_code != 200:
+        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        exit(1)
     data = response.json()
     standings = Standings('codeforces', contest_id, datetime.utcfromtimestamp(data['result']['contest']['startTimeSeconds']).strftime('%d.%m.%Y'))
     for row in data['result']['rows']:
@@ -146,6 +149,9 @@ def get_atcoder_standings(contest_id):
     start_date = get_contest_date(session, contest_id)
     url = f'https://atcoder.jp/contests/{contest_id}/standings/json'
     response = session.get(url, allow_redirects=False)
+    if response.status_code != 200:
+        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        exit(1)
     data = response.json()
     standings = Standings('atcoder', contest_id, start_date)
     for row in data['StandingsData']:
