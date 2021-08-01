@@ -108,6 +108,14 @@ function getRowByHandle(onlineJudge) {
   return rowByHandle;
 }
 
+function sortByTotalRating() {
+  var sheet = ss.getSheetByName('OJ Rating');
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+  var range = sheet.getRange(4, 2, lastRow - 3, lastColumn - 1);
+  range.sort({column: 7, ascending: false});
+}
+
 function addStandingsToTheMainRating(data) {
   var sheet = ss.getSheetByName("OJ Rating");
   var rowByHandle = getRowByHandle(data.online_judge);
@@ -121,6 +129,7 @@ function addStandingsToTheMainRating(data) {
       sheet.getRange(rowByHandle[handle], column).setFormula(`=IF('${data.sheet_name}'!F${i + 2}; 1; Config!F2) * INDIRECT("R1C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
     }
   }
+  sortByTotalRating();
 }
 
 function getCodeforcesRatingColor(rating) {
