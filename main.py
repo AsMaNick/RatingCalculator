@@ -78,9 +78,10 @@ def read_users_from_file():
     
 def load_users():
     spreadsheet_id = open('data/spreadsheet_id.txt', 'r').read()
-    url = f'https://spreadsheets.google.com/feeds/list/{spreadsheet_id}/2/public/values?alt=json'
-    data = requests.get(url).json()['feed']['entry']
-    users = [User(row['gsx$_cokwr']['$t'], row['gsx$_cpzh4']['$t'], row['gsx$_cre1l']['$t']) for row in data[2:]]
+    google_api_key = open('data/google_api_key.txt', 'r').read()
+    url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/OJ Rating?alt=json&key={google_api_key}'
+    data = requests.get(url).json()['values']
+    users = [User(row[1], row[2], row[3]) for row in data[3:]]
     return users
 
 
