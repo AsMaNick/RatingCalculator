@@ -79,7 +79,8 @@ def read_users_from_file():
 def load_users():
     spreadsheet_id = open('data/spreadsheet_id.txt', 'r').read()
     google_api_key = open('data/google_api_key.txt', 'r').read()
-    url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/OJ Rating?alt=json&key={google_api_key}'
+    table_name = open('data/table_name.txt', 'r').read()
+    url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{table_name}?alt=json&key={google_api_key}'
     data = requests.get(url).json()['values']
     users = [User(row[1], row[2], row[3]) for row in data[3:]]
     return users
@@ -216,7 +217,7 @@ def read_date(prompt):
             date = datetime.strptime(str_date, '%d.%m.%Y')
             return date
         except Exception as e:
-            print('Date should be in format mm.dd.yyyy')
+            print('Date should be in format dd.mm.yyyy')
 
 
 def guess_online_judge(contest_id):
@@ -331,7 +332,7 @@ def update_atcoder_ratings(start_date):
 
 def update_ratings_from_user_answers():
     online_judge = read_option('Select online judge (codeforces or atcoder): ', ['codeforces', 'atcoder'])
-    start_date = read_date('Enter start date (mm.dd.yyyy) for rating calculation: ')
+    start_date = read_date('Enter start date (dd.mm.yyyy) for rating calculation: ')
     if online_judge == 'codeforces':
         update_codeforces_ratings(start_date)
     else:

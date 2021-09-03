@@ -1,4 +1,5 @@
 var ss = SpreadsheetApp.getActiveSpreadsheet();
+var table_name = 'OJ Rating 2021 autumn';
 
 function myLog(msg) {
   var logSht = ss.getSheetByName('DebugLog'); 
@@ -94,7 +95,7 @@ function getRatingCoefficientFormula(cell) {
 }
 
 function getRowByHandle(onlineJudge) {
-  var sheet = ss.getSheetByName("OJ Rating");
+  var sheet = ss.getSheetByName(table_name);
   var participants;
   if (onlineJudge == "codeforces") {
     participants = sheet.getRange(`C4:C${sheet.getLastRow()}`).getValues();
@@ -109,7 +110,7 @@ function getRowByHandle(onlineJudge) {
 }
 
 function sortByTotalRating() {
-  var sheet = ss.getSheetByName('OJ Rating');
+  var sheet = ss.getSheetByName(table_name);
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
   var range = sheet.getRange(4, 2, lastRow - 3, lastColumn - 1);
@@ -117,7 +118,7 @@ function sortByTotalRating() {
 }
 
 function addStandingsToTheMainRating(data) {
-  var sheet = ss.getSheetByName("OJ Rating");
+  var sheet = ss.getSheetByName(table_name);
   var rowByHandle = getRowByHandle(data.online_judge);
   var column = sheet.getLastColumn() + 1;
   sheet.getRange(1, column).setFormula(getRatingCoefficientFormula(`INDIRECT("R3C${column}"; FALSE)`));
@@ -217,7 +218,7 @@ function actionCreateStandings(data) {
 
 function actionUpdateRatings(data) {
   myLog("action update");
-  var sheet = ss.getSheetByName("OJ Rating");
+  var sheet = ss.getSheetByName(table_name);
   var rowByHandle = getRowByHandle(data.online_judge);
   var handlesColumn = 3;
   if (data.online_judge == "atcoder") {
