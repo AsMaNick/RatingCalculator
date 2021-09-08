@@ -1,5 +1,6 @@
 var ss = SpreadsheetApp.getActiveSpreadsheet();
 var table_name = 'OJ Rating 2021 autumn';
+var codeforcesListKey = 'cd0882df077418b2f43db6b6756e25df';
 
 function myLog(msg) {
   var logSht = ss.getSheetByName('DebugLog'); 
@@ -30,6 +31,9 @@ function getAtCoderResultLink(contestId, result) {
 
 function getStandingsLink(onlineJudge, constestId, text) {
   if (onlineJudge == "codeforces") {
+    if (codeforcesListKey != '') {
+      return `=HYPERLINK("https://codeforces.com/contest/${constestId}/standings?list=${codeforcesListKey}"; "${text}")`;
+    }
     return `=HYPERLINK("https://codeforces.com/contest/${constestId}/standings"; "${text}")`;
   } else if (onlineJudge == "atcoder") {
     return `=HYPERLINK("https://atcoder.jp/contests/${constestId}/standings"; "${text}")`;
