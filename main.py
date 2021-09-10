@@ -48,9 +48,9 @@ class Standings:
     def add_result(self, handle, points, penalty, is_rated):
         place = 1
         if len(self.results) > 0:
-            place = len(self.results)
+            place = self.results[-1].place
             if points != self.results[-1].points or penalty != self.results[-1].penalty:
-                place += 1
+                place = len(self.results) + 1
         if self.online_judge == 'codeforces':
             user = codeforces_handles[handle]
         elif self.online_judge == 'atcoder':
