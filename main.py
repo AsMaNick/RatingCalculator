@@ -237,7 +237,7 @@ def create_standings_from_user_answers():
         create_standings(online_judge, contest_id, sheet_name)
 
 
-def update_codeforces_ratings(start_date):
+def update_codeforces_ratings(start_date, C_platform):
     start_timestamp = start_date.timestamp()
     wait_time = 5
     ratings = []
@@ -260,11 +260,13 @@ def update_codeforces_ratings(start_date):
             if len(data['result']) == 0:
                 old_last_rating, old_max_rating, current_rating = 0, 0, 0
             else:
-                old_last_rating = 1000
-                old_max_rating = 1200
-                for rating_change in data['result']:
+                old_last_rating = 0
+                old_max_rating = 0
+                for num, rating_change in enumerate(data['result']):
                     if rating_change['ratingUpdateTimeSeconds'] < start_timestamp:
                         old_last_rating = rating_change['newRating']
+                        old_max_rating = max(old_max_rating, rating_change['newRating'])
+                    if num < C_platform:
                         old_max_rating = max(old_max_rating, rating_change['newRating'])
                     current_rating = rating_change['newRating']
             ratings.append({
@@ -285,7 +287,7 @@ def update_codeforces_ratings(start_date):
     print(response.status_code)
 
 
-def update_atcoder_ratings(start_date):
+def update_atcoder_ratings(start_date, C_platform):
     start_timestamp = start_date.timestamp()
     wait_time = 5
     ratings = []
@@ -306,10 +308,12 @@ def update_atcoder_ratings(start_date):
                 continue
             data = response.json()
             old_last_rating, old_max_rating, current_rating = 0, 0, 0
-            for rating_change in data:
+            for num, rating_change in enumerate(data):
                 timestamp = datetime.strptime(rating_change['EndTime'][:10], '%Y-%m-%d').timestamp()
                 if timestamp < start_timestamp:
                     old_last_rating = rating_change['NewRating']
+                    old_max_rating = max(old_max_rating, rating_change['NewRating'])
+                if num < C_platform:
                     old_max_rating = max(old_max_rating, rating_change['NewRating'])
                 current_rating = rating_change['NewRating']
             ratings.append({
@@ -331,12 +335,13 @@ def update_atcoder_ratings(start_date):
 
 
 def update_ratings_from_user_answers():
+    C_codeforecs, C_atcoder = 10, 10
     online_judge = read_option('Select online judge (codeforces or atcoder): ', ['codeforces', 'atcoder'])
     start_date = read_date('Enter start date (dd.mm.yyyy) for rating calculation: ')
     if online_judge == 'codeforces':
-        update_codeforces_ratings(start_date)
+        update_codeforces_ratings(start_date, C_codeforecs)
     else:
-        update_atcoder_ratings(start_date)
+        update_atcoder_ratings(start_date, C_atcoder)
 
 
 users = load_users()
