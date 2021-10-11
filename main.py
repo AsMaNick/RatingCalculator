@@ -21,7 +21,7 @@ class User:
         self.is_official = is_official
 
     def __str__(self):
-        return self.name + ', codeforces: ' + self.codeforces_handle + ', atcoder: ' + self.atcoder_handle
+        return f'{self.name}, codeforces: {self.codeforces_handle}, atcoder: {self.atcoder_handle}, official: {self.is_official}'
 
     def __repr__(self):
         return self.__str__()
@@ -81,7 +81,7 @@ def load_users():
     table_name = open('data/table_name.txt', 'r').read()
     url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{table_name}?alt=json&key={google_api_key}'
     data = requests.get(url).json()['values']
-    users = [User(row[1], row[2], row[3], row[0] != '-') for row in data[3:]]
+    users = [User(row[1], row[3], row[4], row[0] != '-') for row in data[3:]]
     return users
 
 

@@ -113,9 +113,9 @@ function getRowByHandle(onlineJudge) {
   var sheet = ss.getSheetByName(table_name);
   var participants;
   if (onlineJudge == "codeforces") {
-    participants = sheet.getRange(`C4:C${sheet.getLastRow()}`).getValues();
-  } else {
     participants = sheet.getRange(`D4:D${sheet.getLastRow()}`).getValues();
+  } else {
+    participants = sheet.getRange(`E4:E${sheet.getLastRow()}`).getValues();
   }
   rowByHandle = {};
   for (var i = 0; i < participants.length; ++i) {
@@ -129,7 +129,7 @@ function sortByTotalRating() {
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
   var range = sheet.getRange(4, 1, lastRow - 3, lastColumn);
-  range.sort({column: 7, ascending: false});
+  range.sort({column: 8, ascending: false});
   var places = sheet.getRange(`A4:A${sheet.getLastRow()}`).getValues();
   var currentPlace = 0;
   for (var i = 0; i < places.length; ++i) {
