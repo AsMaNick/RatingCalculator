@@ -246,7 +246,7 @@ function actionUpdateRatings(data) {
   myLog("action update");
   var sheet = ss.getSheetByName(table_name);
   var rowByHandle = getRowByHandle(data.online_judge);
-  var handlesColumn = 3;
+  var handlesColumn = 4;
   if (data.online_judge == "atcoder") {
     ++handlesColumn;
   }
