@@ -49,7 +49,7 @@ function getRatingITMO(max_points, participants, points, place) {
   if (participants == 1) {
     return 100;
   }
-  return 50 * points / max_points * (2 * participants - 2) / (participants + place - 2);
+  return Math.min(100, 50 * points / max_points * (2 * participants - 2) / (participants + place - 2));
 }
 
 function createStandings(data) {
@@ -68,9 +68,21 @@ function createStandings(data) {
   sheet.getRange(1, 5).setValue("Штраф");
   sheet.getRange(1, 6).setValue("Is Rated");
   sheet.getRange(1, 7).setValue("Рейтинг");
+  var winnerPoints = 0;
+  for (var result of data.results) {
+    if (result.user.is_official) {
+      winnerPoints = result.points;
+      break;
+    }
+  }
   for (var i = 0; i < data.results.length; ++i) {
+    var ratingITMO = getRatingITMO(winnerPoints, data.official_participants, data.results[i].points, data.results[i].place);
+    if (!data.results[i].user.is_official) {
+      data.results[i].place = "-";
+    }
     if (data.online_judge == "codeforces") {
       sheet.getRange(2 + i, 1).setValue(data.results[i].place);
+      sheet.getRange(2 + i, 1).setHorizontalAlignment("right");
     } else {
       sheet.getRange(2 + i, 1).setValue(data.results[i].place);
       sheet.getRange(2 + i, 1).setFormula(getAtCoderResultLink(data.contest_id, data.results[i]));
@@ -80,7 +92,6 @@ function createStandings(data) {
     sheet.getRange(2 + i, 4).setValue(data.results[i].points);
     sheet.getRange(2 + i, 5).setValue(data.results[i].penalty);
     sheet.getRange(2 + i, 6).setValue(data.results[i].is_rated);
-    var ratingITMO = getRatingITMO(data.results[0].points, data.results.length, data.results[i].points, data.results[i].place);
     sheet.getRange(2 + i, 7).setValue(+ratingITMO.toFixed(2));
   }
 }
@@ -117,8 +128,19 @@ function sortByTotalRating() {
   var sheet = ss.getSheetByName(table_name);
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
-  var range = sheet.getRange(4, 2, lastRow - 3, lastColumn - 1);
+  var range = sheet.getRange(4, 1, lastRow - 3, lastColumn);
   range.sort({column: 7, ascending: false});
+  var places = sheet.getRange(`A4:A${sheet.getLastRow()}`).getValues();
+  var currentPlace = 0;
+  for (var i = 0; i < places.length; ++i) {
+    var place = places[i][0];
+    if (place != '-') {
+      ++currentPlace;
+      place = currentPlace;
+    }
+    places[i][0] = place;
+  }
+  sheet.getRange(`A4:A${sheet.getLastRow()}`).setValues(places);
 }
 
 function addStandingsToTheMainRating(data) {

@@ -10,7 +10,7 @@ from datetime import datetime
 
 
 class User:
-    def __init__(self, name, codeforces_handle, atcoder_handle):
+    def __init__(self, name, codeforces_handle, atcoder_handle, is_official):
         def filter_handle(handle):
             if len(handle) <= 2 or handle.lower() == 'нет':
                 return ''
@@ -18,6 +18,7 @@ class User:
         self.name = name
         self.codeforces_handle = filter_handle(codeforces_handle)
         self.atcoder_handle = filter_handle(atcoder_handle)
+        self.is_official = is_official
 
     def __str__(self):
         return self.name + ', codeforces: ' + self.codeforces_handle + ', atcoder: ' + self.atcoder_handle
@@ -35,7 +36,7 @@ class StandingsRow:
         self.is_rated = is_rated
 
     def __str__(self):
-        return f'{self.place}) {self.user}: ({self.points}, {self.penalty}, rated = {self.is_rated})'
+        return f'{self.place}) {self.user}: ({self.points}, {self.penalty}, rated = {self.is_rated}, official = {self.user.is_official})'
 
 
 class Standings:
@@ -44,24 +45,29 @@ class Standings:
         self.contest_id = contest_id
         self.start_date = start_date
         self.results = []
+        self.last_official_id = -1
+        self.official_participants = 0
 
     def add_result(self, handle, points, penalty, is_rated):
-        place = 1
-        if len(self.results) > 0:
-            place = self.results[-1].place
-            if points != self.results[-1].points or penalty != self.results[-1].penalty:
-                place = len(self.results) + 1
         if self.online_judge == 'codeforces':
             user = codeforces_handles[handle]
         elif self.online_judge == 'atcoder':
             user = atcoder_handles[handle]
         else:
             raise NotImplementedError
+        place = 1
+        if self.last_official_id != -1:
+            place = self.results[self.last_official_id].place
+            if points != self.results[self.last_official_id].points or penalty != self.results[self.last_official_id].penalty:
+                place = self.official_participants + 1
+        if user.is_official:
+            self.official_participants += 1
+            self.last_official_id = len(self.results)
         self.results.append(StandingsRow(user, place, points, penalty, is_rated))
 
     def empty(self):
         for result in self.results:
-            if result.points != 0:
+            if result.user.is_official and result.points != 0:
                 return False
         return True
 
@@ -69,20 +75,13 @@ class Standings:
         return '\n'.join([str(row) for row in self.results])
 
 
-def read_users_from_file():
-    f = open('data/users.txt', 'r', encoding='utf-8')
-    data = f.read().split()
-    users = [User(' '.join(data[i:i + 3]), data[i + 3], data[i + 4]) for i in range(0, len(data), 5)]
-    return users
-    
-    
 def load_users():
     spreadsheet_id = open('data/spreadsheet_id.txt', 'r').read()
     google_api_key = open('data/google_api_key.txt', 'r').read()
     table_name = open('data/table_name.txt', 'r').read()
     url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{table_name}?alt=json&key={google_api_key}'
     data = requests.get(url).json()['values']
-    users = [User(row[1], row[2], row[3]) for row in data[3:]]
+    users = [User(row[1], row[2], row[3], row[0] != '-') for row in data[3:]]
     return users
 
 
