@@ -49,7 +49,8 @@ function getRatingITMO(max_points, participants, points, place) {
   if (participants == 1) {
     return 100;
   }
-  return Math.min(100, 50 * points / max_points * (2 * participants - 2) / (participants + place - 2));
+  var n = Math.max(participants, 10);
+  return Math.min(100, 50 * points / max_points * (2 * n - 2) / (n + place - 2));
 }
 
 function createStandings(data) {
