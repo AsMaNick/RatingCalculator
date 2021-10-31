@@ -26,7 +26,7 @@ function getProfileLink(onlineJudge, user) {
 }
 
 function getAtCoderResultLink(contestId, result) {
-  return `=HYPERLINK("https://atcoder.jp/contests/${contestId}/standings?watching=${result.user.atcoder_handle}"; ${result.place})`
+  return `=HYPERLINK("https://atcoder.jp/contests/${contestId}/standings?watching=${result.user.atcoder_handle}"; "${result.place}")`
 }
 
 function getStandingsLink(onlineJudge, constestId, text) {
