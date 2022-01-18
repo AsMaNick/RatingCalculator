@@ -1,6 +1,8 @@
 var ss = SpreadsheetApp.getActiveSpreadsheet();
-var table_name = 'OJ Rating 2021 autumn';
-var codeforcesListKey = 'cd0882df077418b2f43db6b6756e25df';
+const table_name = 'OJ Rating 2022 winter';
+const configTableName = 'ConfigV2';
+const codeforcesListKey = 'cd0882df077418b2f43db6b6756e25df';
+const onlineJudges = ['codeforces', 'atcoder', 'tlx'];
 
 function myLog(msg) {
   var logSht = ss.getSheetByName('DebugLog'); 
@@ -20,6 +22,8 @@ function getProfileLink(onlineJudge, user) {
     return `=HYPERLINK("https://codeforces.com/profile/${user.codeforces_handle}"; "${user.codeforces_handle}")`;
   } else if (onlineJudge == "atcoder") {
     return `=HYPERLINK("https://atcoder.jp/users/${user.atcoder_handle}"; "${user.atcoder_handle}")`;
+  } else if (onlineJudge == "tlx") {
+    return `=HYPERLINK("https://tlx.toki.id/profiles/${user.tlx_handle}"; "${user.tlx_handle}")`;
   } else {
     return `${onlineJudge}/${handle}`;
   }
@@ -37,6 +41,8 @@ function getStandingsLink(onlineJudge, constestId, text) {
     return `=HYPERLINK("https://codeforces.com/contest/${constestId}/standings"; "${text}")`;
   } else if (onlineJudge == "atcoder") {
     return `=HYPERLINK("https://atcoder.jp/contests/${constestId}/standings"; "${text}")`;
+  } else if (onlineJudge == "tlx") {
+    return `=HYPERLINK("https://tlx.toki.id/contests/${constestId}/scoreboard"; "${text}")`;
   } else {
     return `${text}`;
   }
@@ -81,12 +87,11 @@ function createStandings(data) {
     if (!data.results[i].user.is_official) {
       data.results[i].place = "-";
     }
-    if (data.online_judge == "codeforces") {
-      sheet.getRange(2 + i, 1).setValue(data.results[i].place);
-      sheet.getRange(2 + i, 1).setHorizontalAlignment("right");
-    } else {
-      sheet.getRange(2 + i, 1).setValue(data.results[i].place);
+    sheet.getRange(2 + i, 1).setValue(data.results[i].place);
+    if (data.online_judge == "atcoder") {
       sheet.getRange(2 + i, 1).setFormula(getAtCoderResultLink(data.contest_id, data.results[i]));
+    } else {
+      sheet.getRange(2 + i, 1).setHorizontalAlignment("right");
     }
     sheet.getRange(2 + i, 2).setValue(data.results[i].user.name);
     sheet.getRange(2 + i, 3).setFormula(getProfileLink(data.online_judge, data.results[i].user));
@@ -102,22 +107,20 @@ function getHandle(onlineJudge, user) {
     return user.codeforces_handle;
   } else if (onlineJudge == "atcoder") {
     return user.atcoder_handle;
+  } else if (onlineJudge == "tlx") {
+    return user.tlx_handle;
   }
   return "-";
 }
 
 function getRatingCoefficientFormula(cell) {
-  return `=IF(ISERROR(SEARCH("AGC"; ${cell})); IF(ISERROR(SEARCH("ARC"; ${cell})); IF(ISERROR(SEARCH("ABC"; ${cell})); IF(ISERROR(SEARCH("Div. 1 + Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 1"; ${cell})); IF(ISERROR(SEARCH("Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 3"; ${cell})); 0; 'Config'!B8); 'Config'!B7); 'Config'!B6); 'Config'!B5); 'Config'!B4); 'Config'!B3); 'Config'!B2)`;
+  return `=IF(ISERROR(SEARCH("AGC"; ${cell})); IF(ISERROR(SEARCH("ARC"; ${cell})); IF(ISERROR(SEARCH("ABC"; ${cell})); IF(ISERROR(SEARCH("Div. 1 + Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 1"; ${cell})); IF(ISERROR(SEARCH("Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 3"; ${cell})); IF(ISERROR(SEARCH("TROC"; ${cell})); 0; ConfigV2!B9); '${configTableName}'!B8); '${configTableName}'!B7); '${configTableName}'!B6); '${configTableName}'!B5); '${configTableName}'!B4); '${configTableName}'!B3); '${configTableName}'!B2)`;
 }
 
 function getRowByHandle(onlineJudge) {
   var sheet = ss.getSheetByName(table_name);
-  var participants;
-  if (onlineJudge == "codeforces") {
-    participants = sheet.getRange(`D4:D${sheet.getLastRow()}`).getValues();
-  } else {
-    participants = sheet.getRange(`E4:E${sheet.getLastRow()}`).getValues();
-  }
+  var columnName = String.fromCharCode('D'.charCodeAt(0) + onlineJudges.indexOf(onlineJudge));
+  var participants = sheet.getRange(`${columnName}4:${columnName}${sheet.getLastRow()}`).getValues();
   rowByHandle = {};
   for (var i = 0; i < participants.length; ++i) {
     rowByHandle[participants[i][0]] = i + 4;
@@ -130,7 +133,7 @@ function sortByTotalRating() {
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
   var range = sheet.getRange(4, 1, lastRow - 3, lastColumn);
-  range.sort({column: 8, ascending: false});
+  range.sort({column: 4 + 2 * onlineJudges.length, ascending: false});
   var places = sheet.getRange(`A4:A${sheet.getLastRow()}`).getValues();
   var currentPlace = 0;
   for (var i = 0; i < places.length; ++i) {
@@ -154,7 +157,7 @@ function addStandingsToTheMainRating(data) {
   for (var i = 0; i < data.results.length; ++i) {
     var handle = getHandle(data.online_judge, data.results[i].user);
     if (handle in rowByHandle) {
-      sheet.getRange(rowByHandle[handle], column).setFormula(`=IF('${data.sheet_name}'!F${i + 2}; 1; Config!F2) * INDIRECT("R1C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
+      sheet.getRange(rowByHandle[handle], column).setFormula(`=IF('${data.sheet_name}'!F${i + 2}; 1; ${configTableName}!F2) * INDIRECT("R1C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
     }
   }
   sortByTotalRating();
@@ -200,11 +203,32 @@ function getAtcoderRatingColor(rating) {
   return "#ff0000";
 }
 
+function getTLXRatingColor(rating) {
+  if (rating <= 0) {
+    return "#000000";
+  } else if (rating < 1650) {
+    return "#b7b7b7";
+  } else if (rating < 1750) {
+    return "#70ad47";
+  } else if (rating < 2000) {
+    return "#3c78d8";
+  } else if (rating < 2200) {
+    return "#7030a0";
+  } else if (rating < 2500) {
+    return "#f6b26b";
+  } else if (rating < 3000) {
+    return "#ff0000";
+  }
+  return "#ff0000";
+}
+
 function getRatingColor(onlineJudge, rating) {
   if (onlineJudge == "codeforces") {
     return getCodeforcesRatingColor(rating);
   } else if (onlineJudge == "atcoder") {
     return getAtcoderRatingColor(rating);
+  } else if (onlineJudge == "tlx") {
+    return getTLXRatingColor(rating);
   }
   return "#000000";
 }
@@ -213,7 +237,7 @@ function getRatingDiffColor(delta) {
   if (delta == 0) {
     return [255, 255, 255];
   }
-  var r = 0, g = 0, b = 0, alpha = (15 + 2 * Math.abs(delta)) / 800;
+  var r = 0, g = 0, b = 0, alpha = (15 + 2 * Math.abs(delta)) / 1200;
   if (delta < 0) {
     r = 255;
   } else {
@@ -226,14 +250,11 @@ function getRatingDiffColor(delta) {
 }
 
 function getHandleTextStyle(onlineJudge, rating) {
-  if (onlineJudge == "codeforces" || onlineJudge == "atcoder") {
-      return SpreadsheetApp.newTextStyle()
-        .setForegroundColor(getRatingColor(onlineJudge, rating))
-        .setUnderline(false)
-        .setBold(rating > 0)
-        .build();
-  }
-  return SpreadsheetApp.newTextStyle().build();
+  return SpreadsheetApp.newTextStyle()
+    .setForegroundColor(getRatingColor(onlineJudge, rating))
+    .setUnderline(false)
+    .setBold(rating > 0)
+    .build();
 }
 
 function actionCreateStandings(data) {
@@ -247,17 +268,14 @@ function actionUpdateRatings(data) {
   myLog("action update");
   var sheet = ss.getSheetByName(table_name);
   var rowByHandle = getRowByHandle(data.online_judge);
-  var handlesColumn = 4;
-  if (data.online_judge == "atcoder") {
-    ++handlesColumn;
-  }
+  var handlesColumn = 4 + onlineJudges.indexOf(data.online_judge);
   for (var i = 0; i < data.ratings.length; ++i) {
     var handle = data.ratings[i].handle;
     if (handle in rowByHandle) {
       sheet.getRange(rowByHandle[handle], handlesColumn).setTextStyle(getHandleTextStyle(data.online_judge, data.ratings[i].new_rating));
-      sheet.getRange(rowByHandle[handle], handlesColumn + 2).setValue(`${data.ratings[i].old_rating} → ${data.ratings[i].new_rating}`);
+      sheet.getRange(rowByHandle[handle], handlesColumn + onlineJudges.length).setValue(`${data.ratings[i].old_rating} → ${data.ratings[i].new_rating}`);
       const [r, g, b] = getRatingDiffColor(data.ratings[i].new_rating - data.ratings[i].old_rating);
-      sheet.getRange(rowByHandle[handle], handlesColumn + 2).setBackgroundRGB(r, g, b);
+      sheet.getRange(rowByHandle[handle], handlesColumn + onlineJudges.length).setBackgroundRGB(r, g, b);
     } else {
       myLog(`FAIL, cann't find user ${handle}`);
     }

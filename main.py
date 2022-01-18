@@ -10,7 +10,7 @@ from datetime import datetime
 
 
 class User:
-    def __init__(self, name, codeforces_handle, atcoder_handle, is_official):
+    def __init__(self, name, codeforces_handle, atcoder_handle, tlx_handle, is_official):
         def filter_handle(handle):
             if len(handle) <= 2 or handle.lower() == 'нет':
                 return ''
@@ -18,13 +18,24 @@ class User:
         self.name = name
         self.codeforces_handle = filter_handle(codeforces_handle)
         self.atcoder_handle = filter_handle(atcoder_handle)
+        self.tlx_handle = filter_handle(tlx_handle)
         self.is_official = is_official
 
     def __str__(self):
-        return f'{self.name}, codeforces: {self.codeforces_handle}, atcoder: {self.atcoder_handle}, official: {self.is_official}'
+        handles = ', '.join(f'{online_judge}: {self.get_handle(online_judge)}' for online_judge in online_judges if self.get_handle(online_judge) != '')
+        return f'{self.name}, {handles}, official: {self.is_official}'
 
     def __repr__(self):
         return self.__str__()
+
+    def get_handle(self, online_judge):
+        if online_judge == 'codeforces':
+            return self.codeforces_handle
+        elif online_judge == 'atcoder':
+            return self.atcoder_handle
+        elif online_judge == 'tlx':
+            return self.tlx_handle
+        raise NotImplementedError
 
 
 class StandingsRow:
@@ -41,6 +52,7 @@ class StandingsRow:
 
 class Standings:
     def __init__(self, online_judge, contest_id, start_date):
+        assert(online_judge in online_judges)
         self.online_judge = online_judge
         self.contest_id = contest_id
         self.start_date = start_date
@@ -49,12 +61,7 @@ class Standings:
         self.official_participants = 0
 
     def add_result(self, handle, points, penalty, is_rated):
-        if self.online_judge == 'codeforces':
-            user = codeforces_handles[handle]
-        elif self.online_judge == 'atcoder':
-            user = atcoder_handles[handle]
-        else:
-            raise NotImplementedError
+        user = handles_by_judges[self.online_judge][handle]
         place = 1
         if self.last_official_id != -1:
             place = self.results[self.last_official_id].place
@@ -81,7 +88,7 @@ def load_users():
     table_name = open('data/table_name.txt', 'r').read()
     url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{table_name}?alt=json&key={google_api_key}'
     data = requests.get(url).json()['values']
-    users = [User(row[1], row[3], row[4], row[0] != '-') for row in data[3:]]
+    users = [User(row[1], row[3], row[4], row[5], row[0] != '-') for row in data[3:]]
     return users
 
 
@@ -98,7 +105,7 @@ def get_codeforces_standings(contest_id):
             continue
         members = row['party']['members']
         handle = members[0]['handle']
-        if len(members) != 1 or handle not in codeforces_handles:
+        if len(members) != 1 or handle not in handles_by_judges['codeforces']:
             continue
         standings.add_result(handle, row['points'], row['penalty'], row['party']['participantType'] == 'CONTESTANT')
     return standings
@@ -159,7 +166,7 @@ def get_atcoder_standings(contest_id):
         if not row['IsRated'] and False:
             continue
         handle = row['UserScreenName']
-        if handle not in atcoder_handles:
+        if handle not in handles_by_judges['atcoder']:
             continue
         if not row['TotalResult']['Count']:
             continue
@@ -169,11 +176,43 @@ def get_atcoder_standings(contest_id):
     return standings
 
 
+def get_tlx_standings(contest_id):
+    def get_info(slug):
+        url = f'https://api.tlx.toki.id/v2/contests?page=1'
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(f'{response.status_code}: something went wrong, try again')
+            exit(1)
+        data = response.json()
+        for contest in data['data']['page']:
+            if contest['slug'] == slug:
+                return contest['jid'], contest['beginTime'] // 1000
+        print(f"Can't find contest jid by slug: {slug}")
+        exit(1)
+
+    contest_jid, start_time = get_info(contest_id)
+    url = f'https://api.tlx.toki.id/v2/contests/{contest_jid}/scoreboard?frozen=false&showClosedProblems=false'
+    response = requests.get(url)
+    if response.status_code != 200:
+        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        exit(1)
+    data = response.json()
+    standings = Standings('tlx', contest_id, datetime.utcfromtimestamp(start_time).strftime('%d.%m.%Y'))
+    for row in data['data']['scoreboard']['content']['entries']:
+        handle = row['contestantUsername']
+        if handle not in handles_by_judges['tlx']:
+            continue
+        standings.add_result(handle, row['totalPoints'], row['totalPenalties'], True)
+    return standings
+
+
 def get_standings(online_judge, contest_id):
     if online_judge == 'codeforces':
         return get_codeforces_standings(contest_id)
     elif online_judge == 'atcoder':
         return get_atcoder_standings(contest_id)
+    elif online_judge == 'tlx':
+        return get_tlx_standings(contest_id)
     else:
         raise NotImplementedError
 
@@ -222,6 +261,8 @@ def read_date(prompt):
 def guess_online_judge(contest_id):
     if contest_id[:3] in ['abc', 'arc', 'agc']:
         return 'atcoder'
+    if contest_id.find('troc') != -1:
+        return 'tlx'
     return 'codeforces'
 
 
@@ -230,71 +271,55 @@ def create_standings_from_user_answers():
     online_judge = guess_online_judge(contest_id)
     if online_judge == 'atcoder':
         sheet_name = f'{contest_id[:3].upper()} #{contest_id[3:]}'
+    elif online_judge == 'tlx':
+        division = ''
+        contest_number = contest_id
+        if contest_number.find('div') != -1:
+            division = f' (Div. {contest_number[-1]})'
+            contest_number = contest_number[:-6]
+        sheet_name = f'TROC #{contest_number[5:]}{division}'
     else:
         sheet_name = input('Enter sheet name: ')
     if read_option(f'Create standings "{sheet_name}" with data from {online_judge}/{contest_id}? (yes/no) ', ['y', 'n', 'yes', 'no'])[0] == 'y':
         create_standings(online_judge, contest_id, sheet_name)
 
 
-def update_codeforces_ratings(start_date, C_platform):
+def update_ratings(online_judge, start_date, C_platform):
+    def get_contest_history_url(online_judge, handle):
+        if online_judge == 'codeforces':
+            return f'https://codeforces.com/api/user.rating?handle={handle}'
+        elif online_judge == 'atcoder':
+            return f'https://atcoder.jp/users/{handle}/history/json'
+        elif online_judge == 'tlx':
+            return f'https://api.tlx.toki.id/v2/contest-history/public?username={handle}'
+        raise NotImplementedError
+        
+    def contest_history_iterator(online_judge, data):
+        if online_judge == 'codeforces':
+            for row in data['result']:
+                yield row['ratingUpdateTimeSeconds'], row['newRating']
+        elif online_judge == 'atcoder':
+            for row in data:
+                timestamp = datetime.strptime(row['EndTime'][:10], '%Y-%m-%d').timestamp()
+                yield timestamp, row['NewRating']
+        elif online_judge == 'tlx':
+            for row in data['data']:
+                timestamp = data['contestsMap'][row['contestJid']]['beginTime'] // 1000
+                try:
+                    new_rating = row['rating']['publicRating']
+                except Exception as e:
+                    new_rating = 0
+                yield timestamp, new_rating
+                
     start_timestamp = start_date.timestamp()
     wait_time = 5
     ratings = []
     for user in tqdm(users):
-        if user.codeforces_handle == '':
+        handle = user.get_handle(online_judge)
+        if handle == '':
             continue
         while True:
-            url = f'https://codeforces.com/api/user.rating?handle={user.codeforces_handle}'
-            response = requests.get(url)
-            if response.status_code == 503:
-                time.sleep(wait_time)
-                continue
-            if response.status_code != 200:
-                print(f'Something went wrong, status code = {response.status_code}')
-                print(f'Response text: {response.text}')
-                time.sleep(wait_time)
-                print('Trying to repeat query')
-                continue
-            data = response.json()
-            if len(data['result']) == 0:
-                old_last_rating, old_max_rating, current_rating = 0, 0, 0
-            else:
-                old_last_rating = 0
-                old_max_rating = 0
-                for num, rating_change in enumerate(data['result']):
-                    if rating_change['ratingUpdateTimeSeconds'] < start_timestamp:
-                        old_last_rating = rating_change['newRating']
-                        old_max_rating = max(old_max_rating, rating_change['newRating'])
-                    if num < C_platform:
-                        old_max_rating = max(old_max_rating, rating_change['newRating'])
-                    current_rating = rating_change['newRating']
-            ratings.append({
-                'handle': user.codeforces_handle,
-                'old_rating': max(old_max_rating - 200, old_last_rating),
-                'new_rating': current_rating
-            })
-            break
-    print(*ratings, sep='\n')
-    data = {
-        'ratings': ratings,
-        'action': 'update_ratings',
-        'online_judge': 'codeforces'
-    }
-    spreadsheet_app_id = open('data/spreadsheet_app_id.txt', 'r').read()
-    url = f'https://script.google.com/macros/s/{spreadsheet_app_id}/exec'
-    response = requests.post(url, json=data)
-    print(response.status_code)
-
-
-def update_atcoder_ratings(start_date, C_platform):
-    start_timestamp = start_date.timestamp()
-    wait_time = 5
-    ratings = []
-    for user in tqdm(users):
-        if user.atcoder_handle == '':
-            continue
-        while True:
-            url = f'https://atcoder.jp/users/{user.atcoder_handle}/history/json'
+            url = get_contest_history_url(online_judge, handle)
             response = requests.get(url)
             if response.status_code == 503:
                 time.sleep(wait_time)
@@ -307,16 +332,15 @@ def update_atcoder_ratings(start_date, C_platform):
                 continue
             data = response.json()
             old_last_rating, old_max_rating, current_rating = 0, 0, 0
-            for num, rating_change in enumerate(data):
-                timestamp = datetime.strptime(rating_change['EndTime'][:10], '%Y-%m-%d').timestamp()
+            for num, (timestamp, new_rating) in enumerate(contest_history_iterator(online_judge, data)):
                 if timestamp < start_timestamp:
-                    old_last_rating = rating_change['NewRating']
-                    old_max_rating = max(old_max_rating, rating_change['NewRating'])
+                    old_last_rating = new_rating
+                    old_max_rating = max(old_max_rating, new_rating)
                 if num < C_platform:
-                    old_max_rating = max(old_max_rating, rating_change['NewRating'])
-                current_rating = rating_change['NewRating']
+                    old_max_rating = max(old_max_rating, new_rating)
+                current_rating = new_rating
             ratings.append({
-                'handle': user.atcoder_handle,
+                'handle': handle,
                 'old_rating': max(old_max_rating - 200, old_last_rating),
                 'new_rating': current_rating
             })
@@ -325,7 +349,7 @@ def update_atcoder_ratings(start_date, C_platform):
     data = {
         'ratings': ratings,
         'action': 'update_ratings',
-        'online_judge': 'atcoder'
+        'online_judge': online_judge
     }
     spreadsheet_app_id = open('data/spreadsheet_app_id.txt', 'r').read()
     url = f'https://script.google.com/macros/s/{spreadsheet_app_id}/exec'
@@ -334,18 +358,21 @@ def update_atcoder_ratings(start_date, C_platform):
 
 
 def update_ratings_from_user_answers():
-    C_codeforecs, C_atcoder = 10, 10
-    online_judge = read_option('Select online judge (codeforces or atcoder): ', ['codeforces', 'atcoder'])
+    C = {
+        'codeforces': 10,
+        'atcoder': 10,
+        'tlx': 5,
+    }
+    online_judge = read_option(f'Select online judge ({", ".join(online_judges[:-1])} or {online_judges[-1]}): ', online_judges)
     start_date = read_date('Enter start date (dd.mm.yyyy) for rating calculation: ')
-    if online_judge == 'codeforces':
-        update_codeforces_ratings(start_date, C_codeforecs)
-    else:
-        update_atcoder_ratings(start_date, C_atcoder)
+    update_ratings(online_judge, start_date, C[online_judge])
 
 
+online_judges = ['codeforces', 'atcoder', 'tlx']
 users = load_users()
-codeforces_handles = {user.codeforces_handle : user for user in users if user.codeforces_handle != ''}
-atcoder_handles = {user.atcoder_handle : user for user in users if user.atcoder_handle != ''}
+handles_by_judges = {
+    online_judge: {user.get_handle(online_judge) : user for user in users if user.get_handle(online_judge) != ''} for online_judge in online_judges
+}
 if len(sys.argv) != 2 or sys.argv[1] not in ['-s', '-r']:
     print('There should be exactly one argument: -s for adding standings, -r for updating ratings')
     exit()
