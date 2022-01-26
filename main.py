@@ -284,7 +284,7 @@ def create_standings_from_user_answers():
         create_standings(online_judge, contest_id, sheet_name)
 
 
-def update_ratings(online_judge, start_date, C_platform):
+def update_ratings(online_judge, start_date, C_platform, D_platform):
     def get_contest_history_url(online_judge, handle):
         if online_judge == 'codeforces':
             return f'https://codeforces.com/api/user.rating?handle={handle}'
@@ -332,17 +332,24 @@ def update_ratings(online_judge, start_date, C_platform):
                 continue
             data = response.json()
             old_last_rating, old_max_rating, current_rating = 0, 0, 0
-            for num, (timestamp, new_rating) in enumerate(contest_history_iterator(online_judge, data)):
+            new_ratings = []
+            cnt_rated = 0
+            for timestamp, new_rating in contest_history_iterator(online_judge, data):
                 if timestamp < start_timestamp:
                     old_last_rating = new_rating
                     old_max_rating = max(old_max_rating, new_rating)
-                if num < C_platform:
+                elif current_rating != new_rating:
+                    new_ratings.append(new_rating)
+                if cnt_rated < C_platform:
                     old_max_rating = max(old_max_rating, new_rating)
+                cnt_rated += current_rating != new_rating
                 current_rating = new_rating
+            if len(new_ratings) == 0:
+                new_ratings.append(current_rating)
             ratings.append({
                 'handle': handle,
-                'old_rating': max(old_max_rating - 200, old_last_rating),
-                'new_rating': current_rating
+                'old_rating': max(old_max_rating - D_platform, old_last_rating),
+                'new_rating': max(new_ratings[-((len(new_ratings) + 3) // 4):])
             })
             break
     print(*ratings, sep='\n')
@@ -363,9 +370,14 @@ def update_ratings_from_user_answers():
         'atcoder': 10,
         'tlx': 5,
     }
+    D = {
+        'codeforces': 200,
+        'atcoder': 150,
+        'tlx': 200,
+    }
     online_judge = read_option(f'Select online judge ({", ".join(online_judges[:-1])} or {online_judges[-1]}): ', online_judges)
     start_date = read_date('Enter start date (dd.mm.yyyy) for rating calculation: ')
-    update_ratings(online_judge, start_date, C[online_judge])
+    update_ratings(online_judge, start_date, C[online_judge], D[online_judge])
 
 
 online_judges = ['codeforces', 'atcoder', 'tlx']
