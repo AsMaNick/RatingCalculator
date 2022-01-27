@@ -39,15 +39,15 @@ class User:
 
 
 class StandingsRow:
-    def __init__(self, user, place, points, penalty, is_rated):
+    def __init__(self, user, place, points, penalty, user_group):
         self.user = user
         self.place = place
         self.points = points
         self.penalty = penalty
-        self.is_rated = is_rated
+        self.user_group = user_group
 
     def __str__(self):
-        return f'{self.place}) {self.user}: ({self.points}, {self.penalty}, rated = {self.is_rated}, official = {self.user.is_official})'
+        return f'{self.place}) {self.user}: ({self.points}, {self.penalty}, user_group = {self.user_group}, official = {self.user.is_official})'
 
 
 class Standings:
@@ -57,24 +57,23 @@ class Standings:
         self.contest_id = contest_id
         self.start_date = start_date
         self.results = []
-        self.last_official_id = -1
-        self.official_participants = 0
+        self.last_id = [-1 for i in range(3)]
+        self.n_participants = [0 for i in range(3)]
 
-    def add_result(self, handle, points, penalty, is_rated):
+    def add_result(self, handle, points, penalty, user_group):
         user = handles_by_judges[self.online_judge][handle]
         place = 1
-        if self.last_official_id != -1:
-            place = self.results[self.last_official_id].place
-            if points != self.results[self.last_official_id].points or penalty != self.results[self.last_official_id].penalty:
-                place = self.official_participants + 1
-        if user.is_official:
-            self.official_participants += 1
-            self.last_official_id = len(self.results)
-        self.results.append(StandingsRow(user, place, points, penalty, is_rated))
+        if self.last_id[user_group] != -1:
+            place = self.results[self.last_id[user_group]].place
+            if points != self.results[self.last_id[user_group]].points or penalty != self.results[self.last_id[user_group]].penalty:
+                place = self.n_participants[user_group] + 1
+        self.n_participants[user_group] += 1
+        self.last_id[user_group] = len(self.results)
+        self.results.append(StandingsRow(user, place, points, penalty, user_group))
 
     def empty(self):
         for result in self.results:
-            if result.user.is_official and result.points != 0:
+            if result.points != 0:
                 return False
         return True
 
@@ -107,7 +106,13 @@ def get_codeforces_standings(contest_id):
         handle = members[0]['handle']
         if len(members) != 1 or handle not in handles_by_judges['codeforces']:
             continue
-        standings.add_result(handle, row['points'], row['penalty'], row['party']['participantType'] == 'CONTESTANT')
+        user_group = 2
+        if handles_by_judges['codeforces'][handle].is_official:
+            if row['party']['participantType'] == 'CONTESTANT':
+                user_group = 0
+            else:
+                user_group = 1
+        standings.add_result(handle, row['points'], row['penalty'], user_group)
     return standings
 
 
@@ -152,7 +157,14 @@ def get_atcoder_standings(contest_id):
         month = response[pos + 5:pos + 7]
         day = response[pos + 8:pos + 10]
         return f'{day}.{month}.{year}'
-        
+
+    def get_rated_range_max(contest_id):
+        if contest_id.find('abc') != -1:
+            return 2000
+        if contest_id.find('arc') != -1:
+            return 2800
+        return 10 ** 9
+
     session = login()
     start_date = get_contest_date(session, contest_id)
     url = f'https://atcoder.jp/contests/{contest_id}/standings/json'
@@ -172,7 +184,13 @@ def get_atcoder_standings(contest_id):
             continue
         points = row['TotalResult']['Score'] // 100
         penalty = row['TotalResult']['Elapsed'] // 10 ** 9 + row['TotalResult']['Penalty'] * 5 * 60
-        standings.add_result(handle, points, penalty, row['IsRated'])
+        user_group = 2
+        if handles_by_judges['atcoder'][handle].is_official:
+            if row['OldRating'] < get_rated_range_max(contest_id):
+                user_group = 0
+            else:
+                user_group = 1
+        standings.add_result(handle, points, penalty, user_group)
     return standings
 
 
@@ -202,7 +220,10 @@ def get_tlx_standings(contest_id):
         handle = row['contestantUsername']
         if handle not in handles_by_judges['tlx']:
             continue
-        standings.add_result(handle, row['totalPoints'], row['totalPenalties'], True)
+        user_group = 2
+        if handles_by_judges['tlx'][handle].is_official:
+            user_group = 0
+        standings.add_result(handle, row['totalPoints'], row['totalPenalties'], user_group)
     return standings
 
 

@@ -73,19 +73,18 @@ function createStandings(data) {
   sheet.getRange(1, 3).setValue("Handle");
   sheet.getRange(1, 4).setValue("Балл");
   sheet.getRange(1, 5).setValue("Штраф");
-  sheet.getRange(1, 6).setValue("Is Rated");
+  sheet.getRange(1, 6).setValue("User Group");
   sheet.getRange(1, 7).setValue("Рейтинг");
-  var winnerPoints = 0;
+  var winnerPoints = [-1, -1, -1];
   for (var result of data.results) {
-    if (result.user.is_official) {
-      winnerPoints = result.points;
-      break;
+    if (winnerPoints[result.user_group] == -1) {
+      winnerPoints[result.user_group] = result.points;
     }
   }
   for (var i = 0; i < data.results.length; ++i) {
-    var ratingITMO = getRatingITMO(winnerPoints, data.official_participants, data.results[i].points, data.results[i].place);
-    if (!data.results[i].user.is_official) {
-      data.results[i].place = "-";
+    var ratingITMO = getRatingITMO(winnerPoints[data.results[i].user_group], data.n_participants[data.results[i].user_group], data.results[i].points, data.results[i].place);
+    for (var j = 0; j < data.results[i].user_group; ++j) {
+        data.results[i].place += "*";
     }
     sheet.getRange(2 + i, 1).setValue(data.results[i].place);
     if (data.online_judge == "atcoder") {
@@ -97,7 +96,7 @@ function createStandings(data) {
     sheet.getRange(2 + i, 3).setFormula(getProfileLink(data.online_judge, data.results[i].user));
     sheet.getRange(2 + i, 4).setValue(data.results[i].points);
     sheet.getRange(2 + i, 5).setValue(data.results[i].penalty);
-    sheet.getRange(2 + i, 6).setValue(data.results[i].is_rated);
+    sheet.getRange(2 + i, 6).setValue(data.results[i].user_group);
     sheet.getRange(2 + i, 7).setValue(+ratingITMO.toFixed(2));
   }
 }
@@ -114,7 +113,7 @@ function getHandle(onlineJudge, user) {
 }
 
 function getRatingCoefficientFormula(cell) {
-  return `=IF(ISERROR(SEARCH("AGC"; ${cell})); IF(ISERROR(SEARCH("ARC"; ${cell})); IF(ISERROR(SEARCH("ABC"; ${cell})); IF(ISERROR(SEARCH("Div. 1 + Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 1"; ${cell})); IF(ISERROR(SEARCH("Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 3"; ${cell})); IF(ISERROR(SEARCH("TROC"; ${cell})); 0; ConfigV2!B9); '${configTableName}'!B8); '${configTableName}'!B7); '${configTableName}'!B6); '${configTableName}'!B5); '${configTableName}'!B4); '${configTableName}'!B3); '${configTableName}'!B2)`;
+  return `=IF(ISERROR(SEARCH("AGC"; ${cell})); IF(ISERROR(SEARCH("ARC"; ${cell})); IF(ISERROR(SEARCH("ABC"; ${cell})); IF(ISERROR(SEARCH("Div. 1 + Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 1"; ${cell})); IF(ISERROR(SEARCH("Div. 2"; ${cell})); IF(ISERROR(SEARCH("Div. 3"; ${cell})); IF(ISERROR(SEARCH("TROC"; ${cell})); 0; '${configTableName}'!B9); '${configTableName}'!B8); '${configTableName}'!B7); '${configTableName}'!B6); '${configTableName}'!B5); '${configTableName}'!B4); '${configTableName}'!B3); '${configTableName}'!B2)`;
 }
 
 function getRowByHandle(onlineJudge) {
@@ -157,7 +156,7 @@ function addStandingsToTheMainRating(data) {
   for (var i = 0; i < data.results.length; ++i) {
     var handle = getHandle(data.online_judge, data.results[i].user);
     if (handle in rowByHandle) {
-      sheet.getRange(rowByHandle[handle], column).setFormula(`=IF('${data.sheet_name}'!F${i + 2}; 1; ${configTableName}!F2) * INDIRECT("R1C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
+      sheet.getRange(rowByHandle[handle], column).setFormula(`INDIRECT("R1C${column}"; FALSE) * '${data.sheet_name}'!G${i + 2}`);
     }
   }
   sortByTotalRating();
