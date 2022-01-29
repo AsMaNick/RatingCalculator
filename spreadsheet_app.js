@@ -3,6 +3,7 @@ const table_name = 'OJ Rating 2022 winter';
 const configTableName = 'ConfigV2';
 const codeforcesListKey = 'cd0882df077418b2f43db6b6756e25df';
 const onlineJudges = ['codeforces', 'atcoder', 'tlx'];
+const ratingDeltaColorIntensity = 1000;
 
 function myLog(msg) {
   var logSht = ss.getSheetByName('DebugLog'); 
@@ -236,7 +237,7 @@ function getRatingDiffColor(delta) {
   if (delta == 0) {
     return [255, 255, 255];
   }
-  var r = 0, g = 0, b = 0, alpha = (15 + 2 * Math.abs(delta)) / 1200;
+  var r = 0, g = 0, b = 0, alpha = (15 + 2 * Math.abs(delta)) / ratingDeltaColorIntensity;
   if (delta < 0) {
     r = 255;
   } else {
