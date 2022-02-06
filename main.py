@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import json
+import argparse
 import requests
 import jsonpickle
 import onlinejudge
@@ -287,19 +288,26 @@ def guess_online_judge(contest_id):
     return 'codeforces'
 
 
-def create_standings_from_user_answers():
-    contest_id = input('Enter contest id: ')
+def get_sheet_name(contest_id):
     online_judge = guess_online_judge(contest_id)
     if online_judge == 'atcoder':
-        sheet_name = f'{contest_id[:3].upper()} #{contest_id[3:]}'
+        return f'{contest_id[:3].upper()} #{contest_id[3:]}'
     elif online_judge == 'tlx':
         division = ''
         contest_number = contest_id
         if contest_number.find('div') != -1:
             division = f' (Div. {contest_number[-1]})'
             contest_number = contest_number[:-6]
-        sheet_name = f'TROC #{contest_number[5:]}{division}'
+        return f'TROC #{contest_number[5:]}{division}'
     else:
+        return ''
+
+
+def create_standings_from_user_answers():
+    contest_id = input('Enter contest id: ')
+    online_judge = guess_online_judge(contest_id)
+    sheet_name = get_sheet_name(contest_id)
+    if sheet_name == '':
         sheet_name = input('Enter sheet name: ')
     if read_option(f'Create standings "{sheet_name}" with data from {online_judge}/{contest_id}? (yes/no) ', ['y', 'n', 'yes', 'no'])[0] == 'y':
         create_standings(online_judge, contest_id, sheet_name)
@@ -406,10 +414,33 @@ users = load_users()
 handles_by_judges = {
     online_judge: {user.get_handle(online_judge) : user for user in users if user.get_handle(online_judge) != ''} for online_judge in online_judges
 }
-if len(sys.argv) != 2 or sys.argv[1] not in ['-s', '-r']:
-    print('There should be exactly one argument: -s for adding standings, -r for updating ratings')
-    exit()
-if sys.argv[1] == '-s':
-    create_standings_from_user_answers()
-else:
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-s', '--standings', action='store_true', help='perform action of adding standings')
+parser.add_argument('-r', '--rating', action='store_true', help='perform action of adding ratings')
+parser.add_argument('-l', '--list_standings', type=str, help='filename with list of standings to add')
+args = parser.parse_args()
+if args.standings:
+    if args.list_standings is not None:
+        with open(args.list_standings, 'r') as f:
+            for line in f:
+                line = line.strip()
+                assert len(line.split()) >= 1, f'wrong-formatted line: {line}'
+                if len(line.split()) == 1:
+                    contest_id = line
+                    online_judge = guess_online_judge(contest_id)
+                    sheet_name = get_sheet_name(contest_id)
+                    assert sheet_name != '', f'wrong-formatted line: {line}'
+                elif len(line.split()) >= 2:
+                    contest_id, *sheet_name = line.split()
+                    sheet_name = ' '.join(sheet_name)
+                    assert sheet_name[0] == '"' and sheet_name[-1] == '"', f'wrong-formatted line: {line}'
+                    sheet_name = sheet_name[1:-1]
+                    online_judge = guess_online_judge(contest_id)
+                    assert online_judge == 'codeforces', f'wrong-formatted line: {line}'
+                print(online_judge, contest_id, sheet_name)
+                create_standings(online_judge, contest_id, sheet_name)
+    else:
+        create_standings_from_user_answers()
+elif args.rating:
     update_ratings_from_user_answers()
