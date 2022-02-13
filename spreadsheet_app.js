@@ -1,9 +1,4 @@
 var ss = SpreadsheetApp.getActiveSpreadsheet();
-const table_name = 'OJ Rating 2022 winter';
-const configTableName = 'ConfigV2';
-const codeforcesListKey = 'cd0882df077418b2f43db6b6756e25df';
-const onlineJudges = ['codeforces', 'atcoder', 'tlx'];
-const ratingDeltaColorIntensity = 1000;
 
 function myLog(msg) {
   var logSht = ss.getSheetByName('DebugLog'); 

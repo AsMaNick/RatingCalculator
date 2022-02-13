@@ -92,6 +92,21 @@ def load_users():
     return users
 
 
+def get_codeforces_rated_contestants(contest_id):
+    url = f'https://codeforces.com/api/contest.ratingChanges?contestId={contest_id}'
+    response = requests.get(url)
+    if response.status_code != 200:
+        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        print(response.json())
+        exit(1)
+    data = response.json()
+    result = set()
+    for row in data['result']:
+        if row['handle'] in handles_by_judges['codeforces']:
+            result.add(row['handle'])
+    return result
+
+
 def get_codeforces_standings(contest_id):
     url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}&showUnofficial=true'
     response = requests.get(url)
@@ -100,6 +115,10 @@ def get_codeforces_standings(contest_id):
         exit(1)
     data = response.json()
     standings = Standings('codeforces', contest_id, datetime.utcfromtimestamp(data['result']['contest']['startTimeSeconds']).strftime('%d.%m.%Y'))
+    if data['result']['contest']['name'].lower().find('educational') != -1:
+        rated_contestants = get_codeforces_rated_contestants(contest_id)
+    else:
+        rated_contestants = set(handles_by_judges['codeforces'].keys())
     for row in data['result']['rows']:
         if row['party']['participantType'] != 'OUT_OF_COMPETITION' and row['party']['participantType'] != 'CONTESTANT':
             continue
@@ -109,7 +128,7 @@ def get_codeforces_standings(contest_id):
             continue
         user_group = 2
         if handles_by_judges['codeforces'][handle].is_official:
-            if row['party']['participantType'] == 'CONTESTANT':
+            if row['party']['participantType'] == 'CONTESTANT' and handle in rated_contestants:
                 user_group = 0
             else:
                 user_group = 1
