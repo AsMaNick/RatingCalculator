@@ -353,6 +353,8 @@ def update_ratings(online_judge, start_date, C_platform, D_platform):
         elif online_judge == 'tlx':
             for row in data['data']:
                 timestamp = data['contestsMap'][row['contestJid']]['beginTime'] // 1000
+                if row.get('rating') is None:
+                    continue
                 try:
                     new_rating = row['rating']['publicRating']
                 except Exception as e:
