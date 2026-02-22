@@ -153,8 +153,23 @@ def get_atcoder_standings(contest_id):
         f = open('data/atcoder_credentials.txt', 'w')
         print(username, password, file=f)
         f.close()
-        
-    def login():
+
+    def get_login_cookies(force):
+        if os.path.isfile('data/atcoder_cookies.json') and not force:
+            with open('data/atcoder_cookies.json', 'r') as f:
+                cookies = json.load(f)
+                return cookies
+        print('Login to the https://atcoder.jp, open developer console => Application => '
+              'Storage => Cookies => https://atcoder.jp => REVEL_SESSION => Cookie Value')
+        revel_session = input('Enter REVEL_SESSION cookie: ')
+        cookies = {
+            'REVEL_SESSION': revel_session
+        }
+        with open('data/atcoder_cookies.json', 'w') as f:
+            json.dump(cookies, f, indent=2)
+        return cookies
+
+    def no_captcha_login():
         atcoder = onlinejudge.service.atcoder.AtCoderService()
         while True:
             try:
@@ -163,10 +178,23 @@ def get_atcoder_standings(contest_id):
                 save_credentials(username, password)
                 break
             except onlinejudge.type.LoginError:
-                print('Incorrect username or password, please try again')
+                print('Incorrect username or password, try again')
         session=onlinejudge.service.atcoder.utils.get_default_session()
         return session
-        
+
+    def login():
+        should_force_enter_cookie = False
+        while True:
+            session = requests.session()
+            login_cookies = get_login_cookies(should_force_enter_cookie)
+            session.cookies.set('REVEL_SESSION', login_cookies['REVEL_SESSION'])
+            response = session.get('https://atcoder.jp/contests/abc444/standings/json', allow_redirects=False)
+            if response.status_code == 200:
+                break
+            print(f'Bad response, status code = {response.status_code}, try again.')
+            should_force_enter_cookie = True
+        return session
+
     def get_contest_date(session, contest_id):
         url = f'https://atcoder.jp/contests/{contest_id}'
         response = session.get(url, allow_redirects=False).text
