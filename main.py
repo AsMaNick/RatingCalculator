@@ -2,12 +2,16 @@ import os
 import sys
 import time
 import json
+import random
+import string
+import hashlib
 import argparse
 import requests
 import jsonpickle
 import onlinejudge
 from tqdm import tqdm
 from datetime import datetime
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 
 class User:
@@ -97,6 +101,28 @@ def print_failed_request_info(response):
     print(response.text)
 
 
+def compose_authorized_codeforces_request(url):
+    with open('data/cf_api_key.json', 'r') as f:
+        cf_api_key_info = json.load(f)
+        key = cf_api_key_info['key']
+        secret = cf_api_key_info['secret']
+    parsed = urlparse(url)
+    query_params = dict(parse_qsl(parsed.query))
+    query_params['apiKey'] = key
+    query_params['time'] = str(int(time.time()))
+    sorted_params = sorted(query_params.items())
+    query_string = urlencode(sorted_params)
+    rand = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+    path = parsed.path
+    hash_input = f"{rand}/{path.replace('/api/', '')}?{query_string}#{secret}"
+    hash_digest = hashlib.sha512(hash_input.encode()).hexdigest()
+    api_sig = rand + hash_digest
+    query_params['apiSig'] = api_sig
+    final_query = urlencode(query_params)
+    final_url = urlunparse(parsed._replace(query=final_query))
+    return final_url
+
+
 def get_codeforces_rated_contestants(contest_id):
     url = f'https://codeforces.com/api/contest.ratingChanges?contestId={contest_id}'
     response = requests.get(url)
@@ -114,6 +140,7 @@ def get_codeforces_rated_contestants(contest_id):
 
 def get_codeforces_standings(contest_id):
     url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}&showUnofficial=true'
+    url = compose_authorized_codeforces_request(url)
     response = requests.get(url)
     if response.status_code != 200:
         print_failed_request_info(response)
