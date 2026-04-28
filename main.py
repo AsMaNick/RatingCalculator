@@ -92,11 +92,16 @@ def load_users():
     return users
 
 
+def print_failed_request_info(response):
+    print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+    print(response.text)
+
+
 def get_codeforces_rated_contestants(contest_id):
     url = f'https://codeforces.com/api/contest.ratingChanges?contestId={contest_id}'
     response = requests.get(url)
     if response.status_code != 200:
-        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        print_failed_request_info(response)
         print(response.json())
         exit(1)
     data = response.json()
@@ -111,7 +116,7 @@ def get_codeforces_standings(contest_id):
     url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}&showUnofficial=true'
     response = requests.get(url)
     if response.status_code != 200:
-        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        print_failed_request_info(response)
         exit(1)
     data = response.json()
     standings = Standings('codeforces', contest_id, datetime.utcfromtimestamp(data['result']['contest']['startTimeSeconds']).strftime('%d.%m.%Y'))
@@ -218,7 +223,7 @@ def get_atcoder_standings(contest_id):
     url = f'https://atcoder.jp/contests/{contest_id}/standings/json'
     response = session.get(url, allow_redirects=False)
     if response.status_code != 200:
-        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        print_failed_request_info(response)
         exit(1)
     data = response.json()
     standings = Standings('atcoder', contest_id, start_date)
@@ -260,7 +265,7 @@ def get_tlx_standings(contest_id):
     url = f'https://api.tlx.toki.id/v2/contests/{contest_jid}/scoreboard?frozen=false&showClosedProblems=false'
     response = requests.get(url)
     if response.status_code != 200:
-        print(f'{response.status_code}: incorrect parameters (check contest id), try again')
+        print_failed_request_info(response)
         exit(1)
     data = response.json()
     standings = Standings('tlx', contest_id, datetime.utcfromtimestamp(start_time).strftime('%d.%m.%Y'))
