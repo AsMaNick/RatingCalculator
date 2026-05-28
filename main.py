@@ -139,8 +139,9 @@ def get_codeforces_rated_contestants(contest_id):
 
 
 def get_codeforces_standings(contest_id):
-    url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}&showUnofficial=true'
-    url = compose_authorized_codeforces_request(url)
+    url = f'https://codeforces.com/api/contest.standings?contestId={contest_id}'
+    # url += '&showUnofficial=true' # forbidden as per https://codeforces.com/apiHelp/methods#contest.standings
+    # url = compose_authorized_codeforces_request(url)
     response = requests.get(url)
     if response.status_code != 200:
         print_failed_request_info(response)
